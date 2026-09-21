@@ -1,0 +1,200 @@
+{
+  "users": [
+    {
+      "id": "user_owner_01",
+      "name": "Primary Owner",
+      "email": "ulsolutions.business@gmail.com",
+      "role": "owner",
+      "created_at": "2026-09-21T07:12:41.368Z",
+      "updated_at": "2026-09-21T07:12:41.368Z",
+      "suspended": false,
+      "password_hash": "f2b859f0675c7aa81bb175be3bc7c47dd287d4891e3ee791a21ce917ac489d8ab6da7b810ece2454fe891fdd0fb22ce08ab58aeb65428a8b232d74baa749446a",
+      "salt": "44a4314ba6a85501e9b534e184ef8582"
+    },
+    {
+      "id": "usr_5abd718ff6deec96",
+      "name": "Ahmed umar",
+      "email": "adeizahassanenewo@gmail.com",
+      "role": "user",
+      "created_at": "2026-09-21T07:31:42.455Z",
+      "updated_at": "2026-09-21T07:31:42.455Z",
+      "suspended": false,
+      "password_hash": "f0b12ed68a5e5743145b4a919833a8f67ce00c5b52816b8e9d3ef58e22dde759b266e9ceb85d22e79479437e212bb2d700dba3cee4bb8fc2acd2a243bd82af8b",
+      "salt": "00d839394fbcef8024e2d4c9b3cb5520"
+    }
+  ],
+  "subscriptions": [
+    {
+      "id": "sub_owner_user_owner_01",
+      "user_id": "user_owner_01",
+      "provider": "paystack",
+      "provider_customer_id": "cus_owner_system",
+      "provider_subscription_id": "sub_owner_system",
+      "plan": "verifylink_pro",
+      "plan_name": "VerifyLink Pro (Owner Lifetime)",
+      "amount": 0,
+      "currency": "NGN",
+      "status": "active",
+      "start_date": "2026-09-21T08:15:49.713Z",
+      "expiry_date": "2099-12-31T23:59:59.999Z",
+      "created_at": "2026-09-21T08:15:49.713Z",
+      "updated_at": "2026-09-21T08:15:49.713Z"
+    }
+  ],
+  "verification_requests": [
+    {
+      "id": "vreq_30757da021cbf532",
+      "user_id": "user_owner_01",
+      "token": "3ED60EDB3B33",
+      "label": "Test User",
+      "recipient_name": "Test User",
+      "claimed_location": "Lagos, Nigeria",
+      "purpose": "Test Verification",
+      "initial_notes": "Testing creation endpoint",
+      "status": "active",
+      "created_at": "2026-09-21T09:24:14.177Z",
+      "expires_at": "2026-09-22T09:24:14.177Z",
+      "verified_at": null,
+      "invalidated_at": null
+    },
+    {
+      "id": "vreq_ba23ca6086d0ea79",
+      "user_id": "user_owner_01",
+      "token": "CF4C45E99FD2",
+      "label": "Test",
+      "recipient_name": "Test",
+      "status": "active",
+      "created_at": "2026-09-21T09:25:13.290Z",
+      "expires_at": "2026-09-22T09:25:13.290Z",
+      "verified_at": null,
+      "invalidated_at": null
+    }
+  ],
+  "verification_results": [],
+  "case_notes": [
+    {
+      "id": "note_497d34607afafb3b",
+      "user_id": "user_owner_01",
+      "verification_request_id": "vreq_30757da021cbf532",
+      "note": "Testing creation endpoint",
+      "created_at": "2026-09-21T09:24:14.177Z",
+      "updated_at": "2026-09-21T09:24:14.177Z"
+    }
+  ],
+  "checklists": [],
+  "audit_logs": [
+    {
+      "id": "audit_7d57a18dd63601a5",
+      "actor_user_id": "user_owner_01",
+      "actor_email": "ulsolutions.business@gmail.com",
+      "action": "verification.created",
+      "details": "Verification request created with token: CF4C45E99FD2",
+      "created_at": "2026-09-21T09:25:13.290Z"
+    },
+    {
+      "id": "audit_34a66c131eb6c607",
+      "actor_user_id": "user_owner_01",
+      "actor_email": "ulsolutions.business@gmail.com",
+      "action": "verification.created",
+      "details": "Verification request created with token: 3ED60EDB3B33",
+      "created_at": "2026-09-21T09:24:14.178Z"
+    },
+    {
+      "id": "audit_d26e2b7065b83a30",
+      "actor_user_id": "usr_5abd718ff6deec96",
+      "actor_email": "adeizahassanenewo@gmail.com",
+      "action": "user.signup",
+      "details": "User account created: adeizahassanenewo@gmail.com",
+      "created_at": "2026-09-21T07:31:42.456Z"
+    }
+  ],
+  "settings": {
+    "plan_price_ngn": 5000,
+    "plan_name": "VerifyLink Pro",
+    "allow_new_signups": true,
+    "ip_intelligence_provider": "ipinfo",
+    "rate_limit_per_hour": 60,
+    "maintenance_mode": false
+  },
+  "sessions": [
+    {
+      "token": "ac61dd3cdfaa873b8d4df5e8289db0f57c22e486bcf2ccb4bc0f73421be6baf4",
+      "user_id": "usr_5abd718ff6deec96",
+      "created_at": "2026-09-21T07:31:42.456Z",
+      "expires_at": "2026-10-05T07:31:42.456Z"
+    },
+    {
+      "token": "392fe69fc03419600135a15268227f12c76ccc05e2520fd26c5061722a492761",
+      "user_id": "usr_5abd718ff6deec96",
+      "created_at": "2026-09-21T07:32:41.188Z",
+      "expires_at": "2026-10-05T07:32:41.188Z"
+    },
+    {
+      "token": "21b8d4b0e19b64083f9a0107f5e774637451bff6f42a2e6b3119a25b196ac51b",
+      "user_id": "usr_5abd718ff6deec96",
+      "created_at": "2026-09-21T07:33:05.466Z",
+      "expires_at": "2026-10-05T07:33:05.466Z"
+    },
+    {
+      "token": "59c66c100321d91302f81cb16b72b944c11b35c65d02027a7e1c6451b6b63573",
+      "user_id": "user_owner_01",
+      "created_at": "2026-09-21T07:41:18.059Z",
+      "expires_at": "2026-10-05T07:41:18.059Z"
+    },
+    {
+      "token": "9122b41cb0da3ff6bd1466c49f30d15b57fa6c2b3fdba934dbafe7e2b5819cb8",
+      "user_id": "user_owner_01",
+      "created_at": "2026-09-21T07:41:30.552Z",
+      "expires_at": "2026-10-05T07:41:30.552Z"
+    },
+    {
+      "token": "13a921e28b496b26e7b113e07093a41bdfbe8d054605d93c3f6c5ff07eb838fb",
+      "user_id": "usr_5abd718ff6deec96",
+      "created_at": "2026-09-21T08:05:43.270Z",
+      "expires_at": "2026-10-05T08:05:43.270Z"
+    },
+    {
+      "token": "e9339bba3ff68f71a6c40d44574ea622f5ab1323dbd44834905e30c3b263153b",
+      "user_id": "usr_5abd718ff6deec96",
+      "created_at": "2026-09-21T08:06:06.607Z",
+      "expires_at": "2026-10-05T08:06:06.607Z"
+    },
+    {
+      "token": "fcb0c82e1923a054d136d21e3f3829017a26025ba23d1205749d72df0c4e5532",
+      "user_id": "usr_5abd718ff6deec96",
+      "created_at": "2026-09-21T08:08:04.790Z",
+      "expires_at": "2026-10-05T08:08:04.790Z"
+    },
+    {
+      "token": "489461aea70f0901491d9af7e17c4d52d4accd892efa62d94210431f6f9c88c7",
+      "user_id": "user_owner_01",
+      "created_at": "2026-09-21T08:08:32.319Z",
+      "expires_at": "2026-10-05T08:08:32.319Z"
+    },
+    {
+      "token": "edd0485de4875e40a751becff130be79a217aaad40c9b605505e25eaebcc09bf",
+      "user_id": "user_owner_01",
+      "created_at": "2026-09-21T08:15:49.780Z",
+      "expires_at": "2026-10-05T08:15:49.780Z"
+    },
+    {
+      "token": "347fe16dcb64de49bdff739cb982184c8de353b435813e0a870fe94abb064859",
+      "user_id": "user_owner_01",
+      "created_at": "2026-09-21T08:15:56.657Z",
+      "expires_at": "2026-10-05T08:15:56.657Z"
+    },
+    {
+      "token": "f5e83c9410f37a9c647c5c017033b79ba476c9560947569ae85b36292a297746",
+      "user_id": "user_owner_01",
+      "created_at": "2026-09-21T08:25:09.476Z",
+      "expires_at": "2026-10-05T08:25:09.476Z"
+    },
+    {
+      "token": "efb0b0e7463bfadc9afb84d823ad5cc576a0563942670756a8cddd16f57ab5b6",
+      "user_id": "user_owner_01",
+      "created_at": "2026-09-21T09:24:09.862Z",
+      "expires_at": "2026-10-05T09:24:09.862Z"
+    }
+  ],
+  "password_resets": []
+}

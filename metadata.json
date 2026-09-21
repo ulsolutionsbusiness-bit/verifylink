@@ -1,0 +1,6 @@
+{
+  "name": "VerifyLink",
+  "description": "Mobile-first connection verification, public profile analysis, and fraud-prevention signals platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
