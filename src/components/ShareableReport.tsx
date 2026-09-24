@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getPublicReportUrl } from '../utils/publicUrl';
 import {
   ShieldCheck,
   AlertTriangle,
@@ -53,7 +54,8 @@ export const ShareableReport: React.FC<ShareableReportProps> = ({ token, onBack 
   };
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
+    const url = getPublicReportUrl(token);
+    navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

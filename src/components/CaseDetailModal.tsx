@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../utils/api';
+import { getPublicVerificationUrl, getPublicReportUrl } from '../utils/publicUrl';
 import {
   ShieldCheck,
   X,
@@ -73,7 +74,13 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
         const res = await apiFetch(`/api/verifications/${encodeURIComponent(requestId!)}`);
         const json = await res.json();
         if (res.ok) {
-          setData(json.verification);
+          const v = json.verification || {};
+          setData({
+            verification: v,
+            result: v.result || null,
+            notes: v.notes || [],
+            checklist: v.checklist || null
+          });
         }
       } catch (err) {
         console.error('Error loading case detail:', err);
@@ -175,16 +182,16 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   };
 
   const copyVerificationLink = () => {
-    if (!data) return;
-    const url = `${window.location.origin}/verify/${data.verification.token}`;
+    if (!data?.verification?.token) return;
+    const url = getPublicVerificationUrl(data.verification.token);
     navigator.clipboard.writeText(url);
     setCopiedVerificationLink(true);
     setTimeout(() => setCopiedVerificationLink(false), 2000);
   };
 
   const copyReportLink = () => {
-    if (!data) return;
-    const url = `${window.location.origin}/report/${data.verification.token}`;
+    if (!data?.verification?.token) return;
+    const url = getPublicReportUrl(data.verification.token);
     navigator.clipboard.writeText(url);
     setCopiedReportLink(true);
     setTimeout(() => setCopiedReportLink(false), 2000);
@@ -322,18 +329,18 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
             <div>
               <div className="flex items-center space-x-2">
                 <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-                  {data?.verification.label || 'Verification Case Workspace'}
+                  {data?.verification?.label || 'Verification Case Workspace'}
                 </h2>
-                {data && getStatusBadge(data.verification.status)}
+                {data?.verification && getStatusBadge(data.verification.status)}
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Verification Token: <span className="font-mono font-semibold text-slate-800">{data?.verification.token}</span> • Created {data ? new Date(data.verification.created_at).toLocaleDateString() : ''}
+                Verification Token: <span className="font-mono font-semibold text-slate-800">{data?.verification?.token || '—'}</span> • Created {data?.verification ? new Date(data.verification.created_at).toLocaleDateString() : ''}
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
-            {data?.verification.status === 'active' && (
+            {data?.verification?.status === 'active' && (
               <button
                 id="case-modal-copy-link-btn"
                 onClick={copyVerificationLink}

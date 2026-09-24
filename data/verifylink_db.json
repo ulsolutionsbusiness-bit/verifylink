@@ -51,7 +51,7 @@
       "claimed_location": "Lagos, Nigeria",
       "purpose": "Test Verification",
       "initial_notes": "Testing creation endpoint",
-      "status": "active",
+      "status": "expired",
       "created_at": "2026-09-21T09:24:14.177Z",
       "expires_at": "2026-09-22T09:24:14.177Z",
       "verified_at": null,
@@ -63,9 +63,75 @@
       "token": "CF4C45E99FD2",
       "label": "Test",
       "recipient_name": "Test",
-      "status": "active",
+      "status": "expired",
       "created_at": "2026-09-21T09:25:13.290Z",
       "expires_at": "2026-09-22T09:25:13.290Z",
+      "verified_at": null,
+      "invalidated_at": null
+    },
+    {
+      "id": "vreq_d5c2bba7188cb01e",
+      "user_id": "user_owner_01",
+      "token": "F72AC2006DA0",
+      "label": "Ahmed Umar",
+      "profile_url": "https://www.linkedin.com/in/ahmed-umar-577482430?trk=contact-info",
+      "recipient_name": "Ahmed Umar",
+      "claimed_location": "Lagos Nigeria",
+      "status": "active",
+      "created_at": "2026-09-23T12:13:39.978Z",
+      "expires_at": "2026-09-24T12:13:39.978Z",
+      "verified_at": null,
+      "invalidated_at": null
+    },
+    {
+      "id": "vreq_67ddd64206fe9cf0",
+      "user_id": "user_owner_01",
+      "token": "45B0F4D67CDA",
+      "label": "Test Target",
+      "recipient_name": "Test Target",
+      "claimed_location": "London, UK",
+      "purpose": "Identity Verification",
+      "status": "active",
+      "created_at": "2026-09-23T12:17:44.633Z",
+      "expires_at": "2026-09-24T12:17:44.633Z",
+      "verified_at": null,
+      "invalidated_at": null
+    },
+    {
+      "id": "vreq_c3ca7a96e2ad4f8d",
+      "user_id": "user_owner_01",
+      "token": "92C3DC8018BE",
+      "label": "Test Target",
+      "recipient_name": "Test Target",
+      "status": "active",
+      "created_at": "2026-09-23T12:17:48.017Z",
+      "expires_at": "2026-09-24T12:17:48.017Z",
+      "verified_at": null,
+      "invalidated_at": null
+    },
+    {
+      "id": "vreq_b81a592098fa039a",
+      "user_id": "user_owner_01",
+      "token": "1922CE722840",
+      "label": "Test Target 2",
+      "recipient_name": "Test Target 2",
+      "status": "active",
+      "created_at": "2026-09-23T12:18:51.957Z",
+      "expires_at": "2026-09-24T12:18:51.957Z",
+      "verified_at": null,
+      "invalidated_at": null
+    },
+    {
+      "id": "vreq_077e535c65f22ab8",
+      "user_id": "user_owner_01",
+      "token": "614E2E6A6F55",
+      "label": "Jane Doe",
+      "recipient_name": "Jane Doe",
+      "claimed_location": "Berlin, Germany",
+      "purpose": "Pre-contract verification",
+      "status": "active",
+      "created_at": "2026-09-23T12:20:02.005Z",
+      "expires_at": "2026-09-24T12:20:02.005Z",
       "verified_at": null,
       "invalidated_at": null
     }
@@ -79,10 +145,66 @@
       "note": "Testing creation endpoint",
       "created_at": "2026-09-21T09:24:14.177Z",
       "updated_at": "2026-09-21T09:24:14.177Z"
+    },
+    {
+      "id": "note_3c7745165b98956d",
+      "user_id": "user_owner_01",
+      "verification_request_id": "vreq_67ddd64206fe9cf0",
+      "note": "Verification Purpose: Identity Verification",
+      "created_at": "2026-09-23T12:17:44.633Z",
+      "updated_at": "2026-09-23T12:17:44.633Z"
+    },
+    {
+      "id": "note_1509223e49bf5410",
+      "user_id": "user_owner_01",
+      "verification_request_id": "vreq_077e535c65f22ab8",
+      "note": "Verification Purpose: Pre-contract verification",
+      "created_at": "2026-09-23T12:20:02.006Z",
+      "updated_at": "2026-09-23T12:20:02.006Z"
     }
   ],
   "checklists": [],
   "audit_logs": [
+    {
+      "id": "audit_7c4d55a349d1c49b",
+      "actor_user_id": "user_owner_01",
+      "actor_email": "ulsolutions.business@gmail.com",
+      "action": "verification.created",
+      "details": "Verification request created with token: 614E2E6A6F55",
+      "created_at": "2026-09-23T12:20:02.006Z"
+    },
+    {
+      "id": "audit_258012df23a7aaae",
+      "actor_user_id": "user_owner_01",
+      "actor_email": "ulsolutions.business@gmail.com",
+      "action": "verification.created",
+      "details": "Verification request created with token: 1922CE722840",
+      "created_at": "2026-09-23T12:18:51.957Z"
+    },
+    {
+      "id": "audit_577b6cc95ed85df3",
+      "actor_user_id": "user_owner_01",
+      "actor_email": "ulsolutions.business@gmail.com",
+      "action": "verification.created",
+      "details": "Verification request created with token: 92C3DC8018BE",
+      "created_at": "2026-09-23T12:17:48.018Z"
+    },
+    {
+      "id": "audit_19980e22414b6093",
+      "actor_user_id": "user_owner_01",
+      "actor_email": "ulsolutions.business@gmail.com",
+      "action": "verification.created",
+      "details": "Verification request created with token: 45B0F4D67CDA",
+      "created_at": "2026-09-23T12:17:44.633Z"
+    },
+    {
+      "id": "audit_c3d8dc8fafafbec8",
+      "actor_user_id": "user_owner_01",
+      "actor_email": "ulsolutions.business@gmail.com",
+      "action": "verification.created",
+      "details": "Verification request created with token: F72AC2006DA0 for profile https://www.linkedin.com/in/ahmed-umar-577482430?trk=contact-info",
+      "created_at": "2026-09-23T12:13:39.979Z"
+    },
     {
       "id": "audit_7d57a18dd63601a5",
       "actor_user_id": "user_owner_01",
@@ -194,6 +316,24 @@
       "user_id": "user_owner_01",
       "created_at": "2026-09-21T09:24:09.862Z",
       "expires_at": "2026-10-05T09:24:09.862Z"
+    },
+    {
+      "token": "821b3be034a5d0b44abd411d48e13e1bb228fca3a145c1e9379eec9432cc7756",
+      "user_id": "user_owner_01",
+      "created_at": "2026-09-23T12:13:01.332Z",
+      "expires_at": "2026-10-07T12:13:01.332Z"
+    },
+    {
+      "token": "cfd5c46867e2ba1ab84443a359de942a337fec916dba1d2815c0a925204e4c9c",
+      "user_id": "user_owner_01",
+      "created_at": "2026-09-23T12:17:41.529Z",
+      "expires_at": "2026-10-07T12:17:41.529Z"
+    },
+    {
+      "token": "39086040f736e6ae5bc4b670136c5b477caa056f0279e99fbb958da04d56b319",
+      "user_id": "user_owner_01",
+      "created_at": "2026-09-23T12:20:01.986Z",
+      "expires_at": "2026-10-07T12:20:01.986Z"
     }
   ],
   "password_resets": []

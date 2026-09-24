@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { apiFetch } from '../utils/api';
+import { getPublicVerificationUrl, isDevelopmentPreviewOrigin } from '../utils/publicUrl';
 import {
   Link as LinkIcon,
   X,
@@ -20,7 +21,7 @@ import type { VerificationRequest } from '../types';
 
 interface CreateVerificationModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (createdId?: string) => void;
   onCreated: (vreq: VerificationRequest) => void;
 }
 
@@ -61,22 +62,42 @@ export const CreateVerificationModal: React.FC<CreateVerificationModalProps> = (
         })
       });
 
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {
+        const text = await res.text().catch(() => '');
+        data = { message: text || `Server responded with HTTP ${res.status}` };
+      }
+
       if (!res.ok) {
-        throw new Error(data.message || data.error || 'Failed to generate verification link.');
+        const reason = data.message || data.error || `HTTP ${res.status}: ${res.statusText || 'Request failed'}`;
+        throw new Error(`Unable to create verification request: ${reason}`);
+      }
+
+      if (!data.verification || !data.verification.token) {
+        throw new Error('Unable to create verification request: Server did not return a valid verification record.');
       }
 
       setCreatedRequest(data.verification);
       onCreated(data.verification);
     } catch (err: any) {
-      setError(err.message || 'Could not create verification link.');
+      console.error('[CreateVerificationModal Error]', err);
+      const rawMsg = err?.message || 'Could not create verification link.';
+      if (rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError') || rawMsg.includes('Load failed')) {
+        setError('Unable to create verification request: Network connection to server failed or request was blocked. Please verify your connection.');
+      } else if (!rawMsg.startsWith('Unable to create verification request:')) {
+        setError(`Unable to create verification request: ${rawMsg}`);
+      } else {
+        setError(rawMsg);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const getVerificationUrl = (token: string) => {
-    return `${window.location.origin}/verify/${token}`;
+    return getPublicVerificationUrl(token);
   };
 
   const handleCopy = () => {
@@ -106,6 +127,7 @@ export const CreateVerificationModal: React.FC<CreateVerificationModalProps> = (
   };
 
   const handleResetAndClose = () => {
+    const latestCreatedId = createdRequest?.id;
     setRecipientName('');
     setProfileUrl('');
     setClaimedLocation('');
@@ -114,7 +136,7 @@ export const CreateVerificationModal: React.FC<CreateVerificationModalProps> = (
     setExpiresIn(24 * 60 * 60);
     setCreatedRequest(null);
     setError(null);
-    onClose();
+    onClose(latestCreatedId);
   };
 
   return (
@@ -344,6 +366,12 @@ export const CreateVerificationModal: React.FC<CreateVerificationModalProps> = (
                   <span>{copied ? 'Copied' : 'Copy Link'}</span>
                 </button>
               </div>
+              {isDevelopmentPreviewOrigin() && (
+                <p className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1">
+                  <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span>Public recipient link (<code className="text-blue-700 font-mono">ais-pre-...</code>). Accessible without Google sign-in once deployed.</span>
+                </p>
+              )}
             </div>
 
             {/* Case Details Summary */}

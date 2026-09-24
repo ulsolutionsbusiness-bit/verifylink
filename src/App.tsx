@@ -96,28 +96,14 @@ function AppContent() {
     }
   }, [user, hasAccess, loading]);
 
-  // Prevent routing flash during initial auth verification
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center space-y-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-sm animate-pulse">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <span className="text-xs font-semibold text-slate-500">Initializing VerifyLink secure session...</span>
-        </div>
-      </div>
-    );
-  }
-
-  // Route 1: Recipient verification link /verify/:token
+  // Route 1: Recipient verification link /verify/:token (Public - No login required)
   const verifyMatch = currentPath.match(/^\/verify\/([^/]+)/);
   if (verifyMatch) {
     const token = verifyMatch[1];
     return <RecipientVerification token={token} />;
   }
 
-  // Route 2: Public shareable report /report/:token
+  // Route 2: Public shareable report /report/:token (Public - No login required)
   const reportMatch = currentPath.match(/^\/report\/([^/]+)/);
   if (reportMatch) {
     const token = reportMatch[1];
@@ -130,6 +116,20 @@ function AppContent() {
           setCurrentView(user ? 'dashboard' : 'landing');
         }}
       />
+    );
+  }
+
+  // Prevent routing flash during initial auth verification for dashboard/private views
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center space-y-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-sm animate-pulse">
+            <ShieldCheck className="w-6 h-6" />
+          </div>
+          <span className="text-xs font-semibold text-slate-500">Initializing VerifyLink secure session...</span>
+        </div>
+      </div>
     );
   }
 

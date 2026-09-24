@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../utils/api';
+import { getPublicVerificationUrl } from '../utils/publicUrl';
 import {
   ShieldCheck,
   Plus,
@@ -95,7 +96,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const handleCopyLink = (token: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const url = `${window.location.origin}/verify/${token}`;
+    const url = getPublicVerificationUrl(token);
     navigator.clipboard.writeText(url);
     setCopiedToken(token);
     setTimeout(() => setCopiedToken(null), 2000);
@@ -103,9 +104,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const filteredList = verifications.filter(item => {
     const matchesFilter = filterStatus === 'all' || item.status === filterStatus;
+    const labelText = item.label || item.recipient_name || item.token || '';
     const matchesSearch =
-      item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.token.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      labelText.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.token || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.recipient_name && item.recipient_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (item.claimed_location && item.claimed_location.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesFilter && matchesSearch;
@@ -428,10 +430,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Modals */}
       <CreateVerificationModal
         isOpen={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
-        onCreated={(vreq) => {
+        onClose={(createdId) => {
+          setCreateModalOpen(false);
+          if (createdId) {
+            setSelectedCaseId(createdId);
+          }
+        }}
+        onCreated={() => {
           fetchVerifications();
-          setSelectedCaseId(vreq.id);
         }}
       />
 
