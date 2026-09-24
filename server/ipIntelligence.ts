@@ -43,9 +43,54 @@ export function maskIp(ip: string): string {
   return '***.***.***';
 }
 
+export function formatCountryName(codeOrName?: string): string {
+  if (!codeOrName || codeOrName === 'Unavailable' || codeOrName === 'Unknown') return 'Unavailable';
+  const trimmed = codeOrName.trim();
+  if (trimmed.length === 2) {
+    try {
+      const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+      const fullName = regionNames.of(trimmed.toUpperCase());
+      if (fullName) return fullName;
+    } catch {
+      // fallback if Intl lookup fails
+    }
+  }
+  return trimmed;
+}
+
+export function parseAsnAndIsp(org?: string): { asn: string; isp: string; network: string } {
+  if (!org || org === 'Unavailable' || org === 'Unknown') {
+    return { asn: 'Unavailable', isp: 'Unavailable', network: 'Unavailable' };
+  }
+  const clean = org.trim();
+  const match = clean.match(/^(AS\d+)\s*(.*)$/i);
+  if (match) {
+    const asn = match[1].toUpperCase();
+    const cleanIsp = match[2].trim() || clean;
+    return { asn, isp: cleanIsp, network: cleanIsp };
+  }
+  return { asn: 'Unavailable', isp: clean, network: clean };
+}
+
+export function extractCleanIp(rawIp: string): string {
+  if (!rawIp) return '';
+  let ip = rawIp.trim();
+  if (ip.includes(',')) {
+    ip = ip.split(',')[0].trim();
+  }
+  ip = ip.replace(/^::ffff:/i, '').trim();
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$/.test(ip)) {
+    ip = ip.split(':')[0].trim();
+  } else if (/^\[([a-fA-F0-9:]+)\]:\d+$/.test(ip)) {
+    const match = ip.match(/^\[([a-fA-F0-9:]+)\]:\d+$/);
+    if (match) ip = match[1];
+  }
+  return ip;
+}
+
 function isPrivateOrLocalIp(ip: string): boolean {
   if (!ip) return true;
-  const clean = ip.replace(/^::ffff:/, '').trim();
+  const clean = extractCleanIp(ip);
   return (
     clean === '::1' ||
     clean === '127.0.0.1' ||
@@ -76,7 +121,10 @@ class IpinfoProvider implements IpIntelligenceProvider {
 
   async lookup(ip: string): Promise<IpIntelligenceOutput> {
     const key = process.env.IP_INTELLIGENCE_API_KEY!.trim();
-    const res = await fetch(`https://ipinfo.io/${encodeURIComponent(ip)}?token=${encodeURIComponent(key)}`, {
+    const cleanIp = extractCleanIp(ip);
+    const url = `https://ipinfo.io/${encodeURIComponent(cleanIp)}?token=${encodeURIComponent(key)}`;
+
+    const res = await fetch(url, {
       headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(5000)
     });
@@ -102,12 +150,23 @@ class IpinfoProvider implements IpIntelligenceProvider {
 
     const evidence: SignalEvidence[] = [];
 
-    if (data.country) {
+    const country = formatCountryName(data.country);
+    const region = data.region || 'Unavailable';
+    const city = data.city || 'Unavailable';
+    const { asn, isp, network } = parseAsnAndIsp(data.org);
+
+    if (country && country !== 'Unavailable') {
+      const locationParts: string[] = [];
+      if (city && city !== 'Unavailable' && city !== 'Unknown') locationParts.push(city);
+      if (region && region !== 'Unavailable' && region !== 'Unknown' && region !== city) locationParts.push(region);
+      if (country && country !== 'Unavailable' && country !== 'Unknown') locationParts.push(country);
+      const approxLocation = locationParts.length > 0 ? locationParts.join(', ') : country;
+
       evidence.push({
         type: 'normal',
         category: 'connection',
-        title: 'Observed Network Region',
-        description: `Connection independently observed from ${data.city ? data.city + ', ' : ''}${data.region ? data.region + ', ' : ''}${data.country}. Network routing estimate only.`
+        title: 'Approximate Network Location',
+        description: `Connection independently observed from ${approxLocation}. Approximate network routing estimate only. IP-derived location does not represent GPS or physical presence.`
       });
     }
 
@@ -139,12 +198,12 @@ class IpinfoProvider implements IpIntelligenceProvider {
     }
 
     return {
-      country: data.country || 'Unavailable',
-      region: data.region || 'Unavailable',
-      city: data.city || 'Unavailable',
-      network: data.org || 'Unavailable',
-      isp: data.org || 'Unavailable',
-      asn: data.org ? data.org.split(' ')[0] : 'Unavailable',
+      country,
+      region,
+      city,
+      network,
+      isp,
+      asn,
       vpn_status: vpn,
       proxy_status: proxy,
       datacenter_status: datacenter,
@@ -170,10 +229,9 @@ class IpinfoProvider implements IpIntelligenceProvider {
       connection_type: connType,
       evidence,
       limitations: [
-        'Network location is an approximate estimate derived from IP routing and is not GPS or proof of physical presence.',
         'VPN and proxy detection relies on commercial databases and may produce false positives or false negatives.'
       ],
-      ip_masked: maskIp(ip)
+      ip_masked: maskIp(cleanIp)
     };
   }
 }
@@ -234,7 +292,7 @@ class ProxyCheckProvider implements IpIntelligenceProvider {
     }
 
     return {
-      country: ipData.country || 'Unavailable',
+      country: formatCountryName(ipData.country),
       region: ipData.region || 'Unavailable',
       city: ipData.city || 'Unavailable',
       network: ipData.organisation || 'Unavailable',
@@ -403,7 +461,7 @@ class IpQualityScoreProvider implements IpIntelligenceProvider {
     }
 
     return {
-      country: data.country_code || 'Unavailable',
+      country: formatCountryName(data.country_code),
       region: data.region || 'Unavailable',
       city: data.city || 'Unavailable',
       network: data.organization || data.ISP || 'Unavailable',
@@ -457,8 +515,10 @@ export class CompositeIpIntelligenceService {
   }
 
   public async lookup(ip: string): Promise<IpIntelligenceOutput> {
+    const cleanIp = extractCleanIp(ip);
+
     // 1. Private / Loopback addresses (development sandbox, local testing)
-    if (isPrivateOrLocalIp(ip)) {
+    if (isPrivateOrLocalIp(cleanIp)) {
       return {
         country: 'Cloud Container / Local Network',
         region: 'Internal Network',
@@ -487,7 +547,7 @@ export class CompositeIpIntelligenceService {
           'VPN and proxy detection statuses are reported as Unknown for local/internal test traffic.',
           'Network location is an approximate estimate derived from IP routing and is not GPS or proof of physical presence.'
         ],
-        ip_masked: maskIp(ip)
+        ip_masked: maskIp(cleanIp)
       };
     }
 
@@ -497,17 +557,15 @@ export class CompositeIpIntelligenceService {
 
     if (provider && provider.isConfigured()) {
       try {
-        return await provider.lookup(ip);
+        return await provider.lookup(cleanIp);
       } catch (err: any) {
-        console.warn(`[IP Intelligence] Active provider (${provider.name}) failed, falling back to public geo lookup:`, err.message || err);
+        console.warn(`[IP Intelligence] Active provider (${provider.name}) failed, falling back to public network lookup:`, err.message || err);
       }
     }
 
-    // 3. Fallback when NO API key is configured or provider query failed:
-    // Strictly adhere to user instruction:
-    // "If no IP intelligence provider is configured, do NOT pretend VPN/proxy detection is working.
-    //  The application must return: Detected, Not detected, Unknown.
-    //  When the provider is unavailable, return 'Unknown' with a clear explanation."
+    // 3. Fallback when active provider failed or was not configured:
+    // Performs network lookup solely for approximate location, ISP, and ASN
+    // Security statuses (VPN/Proxy/Datacenter) strictly remain 'unknown' with clear, honest explanations
     let geoCountry = 'Unavailable';
     let geoRegion = 'Unavailable';
     let geoCity = 'Unavailable';
@@ -515,40 +573,104 @@ export class CompositeIpIntelligenceService {
     let geoAsn = 'Unavailable';
     let geoOrg = 'Unavailable';
 
+    // Tier 1 Fallback: ipwho.is (HTTPS, cloud-compatible, rich ISP & ASN details)
     try {
-      // Use public free geo lookup solely for approximate city/country/ISP routing
-      const res = await fetch(`http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,message,country,regionName,city,isp,org,as`, {
+      const res = await fetch(`https://ipwho.is/${encodeURIComponent(cleanIp)}`, {
+        headers: { Accept: 'application/json' },
         signal: AbortSignal.timeout(4000)
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.status === 'success') {
-          geoCountry = data.country || 'Unavailable';
-          geoRegion = data.regionName || 'Unavailable';
+        if (data.success !== false && (data.country || data.country_code)) {
+          geoCountry = formatCountryName(data.country || data.country_code);
+          geoRegion = data.region || 'Unavailable';
           geoCity = data.city || 'Unavailable';
-          geoIsp = data.isp || 'Unavailable';
-          geoOrg = data.org || data.isp || 'Unavailable';
-          geoAsn = data.as ? data.as.split(' ')[0] : 'Unavailable';
+          geoIsp = data.connection?.org || data.connection?.isp || 'Unavailable';
+          geoOrg = data.connection?.org || data.connection?.isp || 'Unavailable';
+          if (data.connection?.asn) {
+            const rawAsn = String(data.connection.asn).trim();
+            geoAsn = rawAsn.toUpperCase().startsWith('AS') ? rawAsn.toUpperCase() : `AS${rawAsn}`;
+          }
         }
       }
     } catch {
-      // network timeout or offline
+      // ipwho.is timed out or offline, try next fallback
+    }
+
+    // Tier 2 Fallback: ipapi.co (HTTPS fallback)
+    if (geoCountry === 'Unavailable') {
+      try {
+        const res = await fetch(`https://ipapi.co/${encodeURIComponent(cleanIp)}/json/`, {
+          headers: { 'User-Agent': 'nodejs-ip-lookup', Accept: 'application/json' },
+          signal: AbortSignal.timeout(4000)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if ((data.country_name || data.country_code) && !data.error) {
+            geoCountry = formatCountryName(data.country_name || data.country_code);
+            geoRegion = data.region || 'Unavailable';
+            geoCity = data.city || 'Unavailable';
+            geoIsp = data.org || data.asn || 'Unavailable';
+            geoOrg = data.org || 'Unavailable';
+            if (data.asn) {
+              const rawAsn = String(data.asn).trim();
+              geoAsn = rawAsn.toUpperCase().startsWith('AS') ? rawAsn.toUpperCase() : `AS${rawAsn}`;
+            }
+          }
+        }
+      } catch {
+        // ipapi.co timed out or offline, try next fallback
+      }
+    }
+
+    // Tier 3 Fallback: ip-api.com (HTTP fallback)
+    if (geoCountry === 'Unavailable') {
+      try {
+        const res = await fetch(`http://ip-api.com/json/${encodeURIComponent(cleanIp)}?fields=status,message,country,regionName,city,isp,org,as`, {
+          signal: AbortSignal.timeout(4000)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'success') {
+            geoCountry = formatCountryName(data.country);
+            geoRegion = data.regionName || 'Unavailable';
+            geoCity = data.city || 'Unavailable';
+            geoIsp = data.org || data.isp || 'Unavailable';
+            geoOrg = data.org || data.isp || 'Unavailable';
+            geoAsn = data.as ? data.as.split(' ')[0] : 'Unavailable';
+          }
+        }
+      } catch {
+        // network timeout or offline
+      }
     }
 
     const evidence: SignalEvidence[] = [];
 
     if (geoCountry !== 'Unavailable') {
+      const locationParts: string[] = [];
+      if (geoCity && geoCity !== 'Unavailable' && geoCity !== 'Unknown') {
+        locationParts.push(geoCity);
+      }
+      if (geoRegion && geoRegion !== 'Unavailable' && geoRegion !== 'Unknown' && geoRegion !== geoCity) {
+        locationParts.push(geoRegion);
+      }
+      if (geoCountry && geoCountry !== 'Unavailable' && geoCountry !== 'Unknown') {
+        locationParts.push(geoCountry);
+      }
+      const approxLocation = locationParts.length > 0 ? locationParts.join(', ') : geoCountry;
+
       evidence.push({
         type: 'normal',
         category: 'connection',
-        title: 'Observed Network Region',
-        description: `Connection observed from ${geoCity !== 'Unavailable' ? geoCity + ', ' : ''}${geoCountry}. Approximate network routing estimate only.`
+        title: 'Approximate Network Location',
+        description: `Connection observed from ${approxLocation}. Approximate network routing estimate only. IP-derived location does not represent GPS, a physical street address, or exact physical presence.`
       });
     } else {
       evidence.push({
         type: 'unavailable',
         category: 'connection',
-        title: 'Network Region Unavailable',
+        title: 'Approximate Network Location Unavailable',
         description: 'Unable to conclusively determine public network location for this connection.'
       });
     }
@@ -578,12 +700,12 @@ export class CompositeIpIntelligenceService {
       connection_type: 'Standard IP Routing',
       evidence,
       limitations: [
-        'Network location is an approximate estimate derived from IP routing and is not GPS or proof of physical presence.',
+        'Network location is an approximate estimate derived from IP routing and is not GPS, physical presence, or a street address.',
         'VPN, Proxy, and Datacenter statuses are recorded as Unknown because IP_INTELLIGENCE_API_KEY is not configured in this environment.',
         'VerifyLink never manufactures, guesses, or fakes detection results when intelligence data is unavailable.',
         'Technical signals are for informational review and do not constitute a fraud, scam, or criminal determination.'
       ],
-      ip_masked: maskIp(ip)
+      ip_masked: maskIp(cleanIp)
     };
   }
 }
