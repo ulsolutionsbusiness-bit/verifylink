@@ -66,6 +66,10 @@ export interface VerificationResult {
   vpn_status: DetectionStatus;
   proxy_status: DetectionStatus;
   datacenter_status: DetectionStatus;
+  vpn_explanation?: string;
+  proxy_explanation?: string;
+  datacenter_explanation?: string;
+  provider_name?: string;
   evidence: SignalEvidence[];
   limitations: string[];
   created_at: string;

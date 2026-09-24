@@ -129,14 +129,57 @@
       "recipient_name": "Jane Doe",
       "claimed_location": "Berlin, Germany",
       "purpose": "Pre-contract verification",
-      "status": "active",
+      "status": "completed",
       "created_at": "2026-09-23T12:20:02.005Z",
       "expires_at": "2026-09-24T12:20:02.005Z",
-      "verified_at": null,
+      "verified_at": "2026-09-24T03:29:40.903Z",
       "invalidated_at": null
     }
   ],
-  "verification_results": [],
+  "verification_results": [
+    {
+      "id": "vres_04e136df22b68ce6",
+      "verification_request_id": "vreq_077e535c65f22ab8",
+      "country": "Cloud Container / Local Environment",
+      "region": "Internal Network",
+      "city": "Local Host",
+      "network": "Development Sandbox",
+      "isp": "Internal Container Network",
+      "asn": "AS-LOCAL",
+      "vpn_status": "unknown",
+      "proxy_status": "unknown",
+      "datacenter_status": "not_detected",
+      "evidence": [
+        {
+          "type": "attention",
+          "category": "connection",
+          "title": "Location Signal",
+          "description": "Approximate regions differ: connection observed at Local Host, Cloud Container / Local Environment, while claimed location was \"Berlin, Germany\"."
+        },
+        {
+          "type": "normal",
+          "category": "connection",
+          "title": "Internal Sandbox Connection",
+          "description": "Connection verified through local development container interface."
+        }
+      ],
+      "limitations": [
+        "The client connected via local/internal loopback address. Detailed public ISP intelligence is not applicable for loopback addresses.",
+        "VPN/Proxy detection is marked as Unknown as required when verified through local test environment."
+      ],
+      "ip_masked": "127.0.***.***",
+      "stated_location": "London, UK",
+      "claimed_location": "Berlin, Germany",
+      "location_consistency": "inconsistent",
+      "location_comparison": "differ",
+      "user_agent": "curl/7.88.1",
+      "browser": "Unknown Browser",
+      "os": "Unknown OS",
+      "device_type": "Desktop",
+      "connection_type": "Development Sandbox",
+      "created_at": "2026-09-24T03:29:40.902Z"
+    }
+  ],
   "case_notes": [
     {
       "id": "note_497d34607afafb3b",
@@ -163,7 +206,24 @@
       "updated_at": "2026-09-23T12:20:02.006Z"
     }
   ],
-  "checklists": [],
+  "checklists": [
+    {
+      "verification_request_id": "vreq_077e535c65f22ab8",
+      "location_consistent": false,
+      "vpn_detected": null,
+      "proxy_detected": null,
+      "datacenter_detected": false,
+      "profile_available": null,
+      "profile_location_available": null,
+      "website_available": null,
+      "identity_consistent": null,
+      "money_requested": null,
+      "urgency_pressure_used": null,
+      "payment_details_matched": null,
+      "additional_verification_refused": null,
+      "updated_at": "2026-09-24T03:29:40.903Z"
+    }
+  ],
   "audit_logs": [
     {
       "id": "audit_7c4d55a349d1c49b",

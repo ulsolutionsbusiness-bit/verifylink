@@ -13,9 +13,11 @@ import {
   FileText,
   Copy,
   Check,
-  Clock,
   Laptop,
-  Compass
+  Compass,
+  Info,
+  ExternalLink,
+  HelpCircle
 } from 'lucide-react';
 import type { DetectionStatus } from '../types';
 
@@ -37,7 +39,7 @@ export const ShareableReport: React.FC<ShareableReportProps> = ({ token, onBack 
         const res = await fetch(`/api/reports/${encodeURIComponent(token)}`);
         const json = await res.json();
         if (!res.ok) {
-          throw new Error(json.error || 'Report not found or unavailable.');
+          throw new Error(json.message || json.error || 'Report not found or unavailable.');
         }
         setData(json.report || json);
       } catch (err: any) {
@@ -61,9 +63,25 @@ export const ShareableReport: React.FC<ShareableReportProps> = ({ token, onBack 
   };
 
   const formatDetection = (val?: DetectionStatus | string) => {
-    if (val === 'detected') return <span className="font-bold text-rose-600">Detected</span>;
-    if (val === 'not_detected') return <span className="font-semibold text-emerald-700">Not detected</span>;
-    return <span className="font-medium text-slate-500">Unknown</span>;
+    if (val === 'detected') {
+      return (
+        <span className="inline-flex items-center space-x-1 font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 text-xs">
+          <span>Detected</span>
+        </span>
+      );
+    }
+    if (val === 'not_detected') {
+      return (
+        <span className="inline-flex items-center space-x-1 font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-xs">
+          <span>Not detected</span>
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center space-x-1 font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 text-xs">
+        <span>Unknown</span>
+      </span>
+    );
   };
 
   if (loading) {
@@ -71,7 +89,7 @@ export const ShareableReport: React.FC<ShareableReportProps> = ({ token, onBack 
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <div className="text-center">
           <div className="w-10 h-10 rounded-full border-3 border-blue-600 border-t-transparent animate-spin mx-auto mb-3"></div>
-          <p className="text-sm font-medium text-slate-600">Generating verification report...</p>
+          <p className="text-sm font-medium text-slate-600">Generating factual signal report...</p>
         </div>
       </div>
     );
@@ -87,9 +105,9 @@ export const ShareableReport: React.FC<ShareableReportProps> = ({ token, onBack 
           {onBack && (
             <button
               onClick={onBack}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold"
+              className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 transition-colors"
             >
-              Return
+              Return to Dashboard
             </button>
           )}
         </div>
@@ -97,19 +115,73 @@ export const ShareableReport: React.FC<ShareableReportProps> = ({ token, onBack 
     );
   }
 
-  const reportId = data.report_id || data.verification?.token || token;
-  const label = data.label || data.verification?.label || 'Verification Case';
-  const status = data.status || data.verification?.status || 'active';
-  const connection = data.connection || data.result;
-  const checklist = data.checklist;
-  const notes = data.user_provided_notes || data.notes;
-  const recipientName = data.recipient_name || data.user_provided_information?.recipient_name;
-  const claimedLocation = data.claimed_location || data.user_provided_information?.claimed_location;
-  const purpose = data.purpose || data.user_provided_information?.purpose;
-  const profileUrl = data.profile_url || data.profile_information?.profile_url;
+  // Normalized Section Variables
+  const reportId = data.report_id || data.case_record?.report_id || token;
+  const status = data.status || data.case_record?.status || 'active';
+  const label = data.label || data.case_record?.label || 'Verification Case';
+  const createdAt = data.created_at || data.case_record?.created_at;
+  const verifiedAt = data.verified_at || data.case_record?.verified_at;
+  const expiresAt = data.expires_at || data.case_record?.expires_at;
+
+  const userProvided = data.user_provided_information || {};
+  const recipientName = userProvided.recipient_name || data.recipient_name;
+  const claimedLocation = userProvided.claimed_location || data.claimed_location;
+  const purpose = userProvided.purpose || data.purpose;
+  const userNotes = userProvided.user_notes || data.user_provided_notes || [];
+  const transactionChecklist = userProvided.transaction_checklist || data.checklist?.transaction_checklist;
+
+  const observedSignals = data.observed_connection_signals || data.connection;
+  const locationComparison = data.location_comparison;
+  const vpnProxy = data.vpn_proxy_indicators || {
+    vpn_status: observedSignals?.vpn_status || 'unknown',
+    proxy_status: observedSignals?.proxy_status || 'unknown',
+    datacenter_status: observedSignals?.datacenter_status || 'unknown',
+    vpn_explanation: observedSignals?.vpn_explanation,
+    proxy_explanation: observedSignals?.proxy_explanation,
+    datacenter_explanation: observedSignals?.datacenter_explanation,
+    provider_name: observedSignals?.provider_name
+  };
+
+  const deviceEnv = data.device_browser_environment || {
+    device_type: observedSignals?.device_type || 'Unavailable',
+    os: observedSignals?.os || 'Unavailable',
+    browser: observedSignals?.browser || 'Unavailable'
+  };
+
+  const publicProfile = data.public_profile_reference || {
+    url: data.profile_url || data.profile_information?.profile_url,
+    platform: data.profile_information?.platform,
+    disclaimer: 'Supporting reference only. VerifyLink does not access private accounts, authenticated content, or passwords. Only publicly accessible web metadata is examined.'
+  };
+
+  const limitationsData = data.limitations_and_privacy || {
+    mandatory_statement:
+      data.disclaimer ||
+      'VerifyLink provides factual information and signals for review. It does not determine whether a person is a scammer or criminal. Network location is approximate and does not prove physical presence. VPN/proxy detection relies on commercial databases and may produce false positives or false negatives. Public information may be incomplete.',
+    limitations_list: observedSignals?.limitations || [
+      'Network location is an approximate estimate derived from IP routing and is not GPS or proof of physical presence.',
+      'VPN and proxy detection relies on commercial databases and may produce false positives or false negatives.',
+      'Technical signals are for informational review and do not constitute legal or fraud determinations.'
+    ]
+  };
+
+  // Derive comparison text cleanly
+  const comparisonResultText =
+    locationComparison?.comparison_result ||
+    (observedSignals?.location_comparison === 'consistent'
+      ? 'Approximate regions are consistent.'
+      : observedSignals?.location_comparison === 'differ'
+      ? 'Approximate regions differ.'
+      : 'Unable to compare.');
+
+  const observedRegionDisplay =
+    locationComparison?.observed_network_region ||
+    (observedSignals
+      ? `${observedSignals.city && observedSignals.city !== 'Unavailable' && observedSignals.city !== 'Unknown' ? observedSignals.city + ', ' : ''}${observedSignals.region && observedSignals.region !== 'Unavailable' && observedSignals.region !== 'Unknown' ? observedSignals.region + ', ' : ''}${observedSignals.country}`
+      : 'Unavailable');
 
   return (
-    <div className="min-h-screen bg-slate-100 py-8 px-4 sm:px-6 lg:px-8 print:bg-white print:p-0">
+    <div className="min-h-screen bg-slate-100 py-8 px-4 sm:px-6 lg:px-8 print:bg-white print:p-0 antialiased">
       <div className="max-w-3xl mx-auto space-y-6 print:space-y-4">
         {/* Action Header (Hidden in Print) */}
         <div className="flex items-center justify-between print:hidden">
@@ -145,7 +217,7 @@ export const ShareableReport: React.FC<ShareableReportProps> = ({ token, onBack 
         </div>
 
         {/* Printable Report Document Card */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-10 space-y-6 print:border-none print:shadow-none print:p-0">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-10 space-y-8 print:border-none print:shadow-none print:p-0">
           {/* Header */}
           <div className="border-b border-slate-200 pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center space-x-3">
@@ -167,7 +239,7 @@ export const ShareableReport: React.FC<ShareableReportProps> = ({ token, onBack 
               <div><strong className="text-slate-800">Verification ID:</strong> <span className="font-mono">{reportId}</span></div>
               <div><strong>Generated:</strong> {new Date().toLocaleString()}</div>
               <div>
-                <strong>Verification Status:</strong>{' '}
+                <strong>Status:</strong>{' '}
                 <span className={`uppercase font-bold px-2 py-0.5 rounded text-[10px] ${
                   status === 'completed'
                     ? 'bg-emerald-100 text-emerald-800'
@@ -181,20 +253,148 @@ export const ShareableReport: React.FC<ShareableReportProps> = ({ token, onBack 
             </div>
           </div>
 
-          {/* Case Identification */}
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Case Record</span>
-              <span className="text-[10px] font-semibold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
-                Factual Evidence Summary
+          {/* SECTION A. Case Record */}
+          <section className="space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+                <span className="w-5 h-5 rounded-full bg-slate-800 text-white flex items-center justify-center text-[10px] font-bold">A</span>
+                <span>Case Record</span>
+              </h2>
+              <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                Administrative Record
               </span>
             </div>
-            <div className="text-lg font-bold text-slate-900">{label}</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600 pt-1 border-t border-slate-200/60">
-              {recipientName && <div><strong>Person / Nickname:</strong> {recipientName}</div>}
-              {purpose && <div><strong>Verification Context:</strong> {purpose}</div>}
+
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+              <div className="text-base font-bold text-slate-900">{label}</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-600">
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Verification ID / Token:</span>
+                  <span className="font-mono text-slate-900 font-semibold">{reportId}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Status:</span>
+                  <span className="font-semibold text-slate-900 capitalize">{status}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Created Date:</span>
+                  <span className="text-slate-800">{createdAt ? new Date(createdAt).toLocaleString() : 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Response Timestamp:</span>
+                  <span className="text-slate-800">{verifiedAt ? new Date(verifiedAt).toLocaleString() : 'Pending or No response'}</span>
+                </div>
+                {recipientName && (
+                  <div>
+                    <span className="text-slate-500 block text-[11px]">Target Person / Nickname:</span>
+                    <span className="text-slate-800 font-medium">{recipientName}</span>
+                  </div>
+                )}
+                {purpose && (
+                  <div>
+                    <span className="text-slate-500 block text-[11px]">Verification Context:</span>
+                    <span className="text-slate-800 font-medium">{purpose}</span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          </section>
+
+          {/* SECTION B. User-Provided Information */}
+          <section className="space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+                <span className="w-5 h-5 rounded-full bg-amber-600 text-white flex items-center justify-center text-[10px] font-bold">B</span>
+                <span>User-Provided Information</span>
+              </h2>
+              <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
+                Provided by User
+              </span>
+            </div>
+
+            <div className="p-4 bg-amber-50/40 rounded-xl border border-amber-200/80 space-y-3">
+              <div className="text-[11px] text-amber-900 italic font-medium">
+                Notice: All items in this section were entered directly by the requester and have NOT been independently verified by VerifyLink.
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
+                <div className="p-3 bg-white rounded-lg border border-amber-200/60">
+                  <span className="text-slate-500 block text-[11px]">Claimed Location:</span>
+                  <span className="font-semibold text-slate-900">{claimedLocation || 'Not specified by requester'}</span>
+                </div>
+
+                <div className="p-3 bg-white rounded-lg border border-amber-200/60">
+                  <span className="text-slate-500 block text-[11px]">Context / Purpose:</span>
+                  <span className="font-semibold text-slate-900">{purpose || 'General verification'}</span>
+                </div>
+              </div>
+
+              {/* Transaction Checklist Flags (User-provided) */}
+              {transactionChecklist && (
+                <div className="pt-2">
+                  <span className="text-[11px] font-bold text-slate-700 block mb-1.5 uppercase tracking-wider">
+                    Requester Context Checklist (User-Provided Indicators)
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-white p-3 rounded-lg border border-amber-200/60">
+                    <div className="flex items-center space-x-2">
+                      <span className={transactionChecklist.money_requested ? 'text-amber-700 font-bold' : 'text-slate-400'}>
+                        {transactionChecklist.money_requested ? '✓' : '○'}
+                      </span>
+                      <span className={transactionChecklist.money_requested ? 'font-medium text-slate-800' : 'text-slate-500'}>
+                        Financial transfer or money requested
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <span className={transactionChecklist.urgency_pressure_used ? 'text-amber-700 font-bold' : 'text-slate-400'}>
+                        {transactionChecklist.urgency_pressure_used ? '✓' : '○'}
+                      </span>
+                      <span className={transactionChecklist.urgency_pressure_used ? 'font-medium text-slate-800' : 'text-slate-500'}>
+                        Urgency or pressure tactics noted
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <span className={transactionChecklist.payment_details_matched ? 'text-emerald-700 font-bold' : 'text-slate-400'}>
+                        {transactionChecklist.payment_details_matched ? '✓' : '○'}
+                      </span>
+                      <span className={transactionChecklist.payment_details_matched ? 'font-medium text-slate-800' : 'text-slate-500'}>
+                        Payment details matched identity
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <span className={transactionChecklist.additional_verification_refused ? 'text-amber-700 font-bold' : 'text-slate-400'}>
+                        {transactionChecklist.additional_verification_refused ? '✓' : '○'}
+                      </span>
+                      <span className={transactionChecklist.additional_verification_refused ? 'font-medium text-slate-800' : 'text-slate-500'}>
+                        Refused other verification methods
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Case Notes */}
+              {userNotes && userNotes.length > 0 && (
+                <div className="pt-2">
+                  <span className="text-[11px] font-bold text-slate-700 block mb-1.5 uppercase tracking-wider">
+                    Requester Case Notes
+                  </span>
+                  <div className="space-y-1.5">
+                    {userNotes.map((n: any) => (
+                      <div key={n.id} className="p-2.5 bg-white rounded-lg border border-amber-200/60 text-xs">
+                        <p className="text-slate-800">{n.note}</p>
+                        <div className="text-[10px] text-slate-400 mt-1">
+                          Entered: {new Date(n.created_at).toLocaleString()} • Provided by User
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
 
           {/* If Verification Was Declined */}
           {status === 'declined' && (
@@ -207,259 +407,285 @@ export const ShareableReport: React.FC<ShareableReportProps> = ({ token, onBack 
                 «“The recipient declined the connection verification. This does not prove fraud.”»
               </p>
               <p className="text-xs text-slate-500">
-                In strict compliance with VerifyLink privacy rules, no connection or IP intelligence signals were collected or stored.
+                In strict compliance with VerifyLink voluntary consent protections, no connection or IP intelligence signals were collected or stored.
               </p>
             </div>
           )}
 
-          {/* 1. Connection Signals */}
-          {connection && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                    Observed Connection Signals
-                  </h2>
-                </div>
-                <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+          {/* SECTION C. Observed Connection Signals */}
+          {observedSignals && status !== 'declined' && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+                  <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">C</span>
+                  <span>Observed Connection Signals</span>
+                </h2>
+                <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                   Observed by VerifyLink
                 </span>
               </div>
 
-              {/* Location Comparison Block */}
-              {claimedLocation && (
-                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
-                  <div className="font-bold text-slate-800 uppercase tracking-wider text-[11px] flex items-center space-x-1.5">
-                    <Compass className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Location Comparison</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <span className="text-slate-500 block text-[11px]">Claimed Location (User-Provided):</span>
-                      <span className="font-semibold text-slate-900">{claimedLocation}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[11px]">Observed Network Region:</span>
-                      <span className="font-semibold text-slate-900">
-                        {connection.city && connection.city !== 'Unknown' ? `${connection.city}, ` : ''}{connection.country}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="pt-1 flex items-center justify-between border-t border-slate-200">
-                    <span className="text-slate-600">Regional Comparison:</span>
-                    <span className="font-bold text-slate-900">
-                      {connection.location_comparison === 'consistent'
-                        ? 'Approximate regions appear consistent.'
-                        : connection.location_comparison === 'differ'
-                        ? 'Approximate regions differ.'
-                        : 'Unable to compare.'}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Factual Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                   <div className="text-[11px] font-semibold text-slate-500 uppercase">Approximate Location</div>
                   <div className="text-sm font-bold text-slate-900 mt-0.5">
-                    {connection.city && connection.city !== 'Unknown' ? `${connection.city}, ` : ''}{connection.country}
+                    {observedSignals.city && observedSignals.city !== 'Unavailable' && observedSignals.city !== 'Unknown'
+                      ? `${observedSignals.city}, `
+                      : ''}
+                    {observedSignals.country}
                   </div>
-                  <div className="text-[10px] text-slate-400">Network routing estimate</div>
+                  <div className="text-[10px] text-slate-400">Network routing estimate only</div>
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                   <div className="text-[11px] font-semibold text-slate-500 uppercase">Network / ISP</div>
-                  <div className="text-sm font-bold text-slate-900 mt-0.5 truncate" title={connection.network}>
-                    {connection.isp || connection.network}
+                  <div className="text-sm font-bold text-slate-900 mt-0.5 truncate" title={observedSignals.network}>
+                    {observedSignals.isp || observedSignals.network || 'Unavailable'}
                   </div>
-                  <div className="text-[10px] text-slate-400">{connection.asn || 'ASN unknown'}</div>
+                  <div className="text-[10px] text-slate-400">{observedSignals.asn || 'ASN unknown'}</div>
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                   <div className="text-[11px] font-semibold text-slate-500 uppercase">Connection Type</div>
                   <div className="text-sm font-bold text-slate-900 mt-0.5">
-                    {connection.connection_type || connection.network || 'Standard IP Routing'}
+                    {observedSignals.connection_type || 'Standard IP Routing'}
                   </div>
-                  <div className="text-[10px] text-slate-400">Infrastructure</div>
+                  <div className="text-[10px] text-slate-400">Infrastructure type</div>
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                  <div className="text-[11px] font-semibold text-slate-500 uppercase">VPN Status</div>
-                  <div className="text-sm mt-0.5">{formatDetection(connection.vpn_status)}</div>
-                  <div className="text-[10px] text-slate-400">Commercial VPN indicator</div>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                  <div className="text-[11px] font-semibold text-slate-500 uppercase">Proxy Status</div>
-                  <div className="text-sm mt-0.5">{formatDetection(connection.proxy_status)}</div>
-                  <div className="text-[10px] text-slate-400">Open proxy lookup</div>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                  <div className="text-[11px] font-semibold text-slate-500 uppercase">Timestamp</div>
-                  <div className="text-xs font-semibold text-slate-800 mt-0.5">
-                    {connection.timestamp ? new Date(connection.timestamp).toLocaleString() : 'N/A'}
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase">Masked IP Summary</div>
+                  <div className="text-xs font-mono font-semibold text-slate-800 mt-1">
+                    {observedSignals.ip_masked || observedSignals.ip_summary || '***.***.***'}
                   </div>
-                  <div className="text-[10px] text-slate-400">Observed at verification</div>
+                  <div className="text-[10px] text-slate-400">Raw IP masked for privacy</div>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase">Observation Time</div>
+                  <div className="text-xs font-semibold text-slate-800 mt-1">
+                    {observedSignals.timestamp || observedSignals.created_at
+                      ? new Date(observedSignals.timestamp || observedSignals.created_at).toLocaleString()
+                      : 'N/A'}
+                  </div>
+                  <div className="text-[10px] text-slate-400">Recorded upon voluntary consent</div>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase">Intelligence Provider</div>
+                  <div className="text-xs font-semibold text-slate-800 mt-1 truncate" title={vpnProxy.provider_name}>
+                    {vpnProxy.provider_name || 'Standard Geo Routing'}
+                  </div>
+                  <div className="text-[10px] text-slate-400">Source provider</div>
                 </div>
               </div>
 
-              {/* Observed Device & Browser Environment */}
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
-                    <Laptop className="w-3.5 h-3.5 text-slate-600" />
-                    <span>Observed Device &amp; Browser Environment</span>
-                  </span>
-                  <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                    Observed by VerifyLink
+              <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-[11px] text-slate-500">
+                Derived from public IP routing tables. Reflects network carrier infrastructure and is NOT GPS or proof of physical presence.
+              </div>
+            </section>
+          )}
+
+          {/* SECTION D. Location Comparison */}
+          {observedSignals && status !== 'declined' && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold">D</span>
+                  <span>Location Comparison</span>
+                </h2>
+                <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                  Factual Comparison
+                </span>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3 bg-white rounded-lg border border-slate-200">
+                    <span className="text-slate-500 block text-[11px] uppercase tracking-wider font-semibold">
+                      Claimed Location (User-Provided)
+                    </span>
+                    <span className="font-bold text-slate-900 text-sm mt-0.5 block">
+                      {claimedLocation || 'Not specified by requester'}
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-lg border border-slate-200">
+                    <span className="text-slate-500 block text-[11px] uppercase tracking-wider font-semibold">
+                      Observed Network Region (Independently Derived)
+                    </span>
+                    <span className="font-bold text-slate-900 text-sm mt-0.5 block">
+                      {observedRegionDisplay}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-white rounded-lg border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <span className="text-slate-600 font-semibold">Comparison Result:</span>
+                  <span className={`text-sm font-bold px-3 py-1 rounded-full ${
+                    comparisonResultText === 'Approximate regions are consistent.'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : comparisonResultText === 'Approximate regions differ.'
+                      ? 'bg-amber-100 text-amber-900'
+                      : 'bg-slate-200 text-slate-800'
+                  }`}>
+                    {comparisonResultText}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-3 text-xs">
-                  <div>
-                    <span className="text-slate-500 block text-[11px]">Device Type:</span>
-                    <span className="font-bold text-slate-900">{connection.device_type || 'Desktop'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[11px]">Operating System:</span>
-                    <span className="font-bold text-slate-900">{connection.os || 'Unavailable'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[11px]">Browser:</span>
-                    <span className="font-bold text-slate-900">{connection.browser || 'Unavailable'}</span>
-                  </div>
+
+                <p className="text-[11px] text-slate-500 italic">
+                  Note: Network routing boundaries may differ from physical borders. Network location is an approximate estimate derived from IP routing tables and is NOT GPS or proof of physical presence.
+                </p>
+              </div>
+            </section>
+          )}
+
+          {/* SECTION E. VPN/Proxy Indicators */}
+          {observedSignals && status !== 'declined' && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+                  <span className="w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center text-[10px] font-bold">E</span>
+                  <span>VPN / Proxy Indicators</span>
+                </h2>
+                <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                  Commercial Heuristics
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase">Commercial VPN</div>
+                  <div>{formatDetection(vpnProxy.vpn_status)}</div>
+                  <p className="text-[11px] text-slate-500 pt-1 leading-snug">
+                    {vpnProxy.vpn_explanation || 'Commercial VPN signatures lookup.'}
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase">Proxy Server</div>
+                  <div>{formatDetection(vpnProxy.proxy_status)}</div>
+                  <p className="text-[11px] text-slate-500 pt-1 leading-snug">
+                    {vpnProxy.proxy_explanation || 'Open proxy signatures lookup.'}
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase">Datacenter / Hosting</div>
+                  <div>{formatDetection(vpnProxy.datacenter_status)}</div>
+                  <p className="text-[11px] text-slate-500 pt-1 leading-snug">
+                    {vpnProxy.datacenter_explanation || 'Hosting or cloud infrastructure IP.'}
+                  </p>
                 </div>
               </div>
 
-              {/* Evidence Signals */}
-              {connection.evidence && connection.evidence.length > 0 && (
-                <div className="space-y-2 pt-1">
-                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Signal Observations
-                  </div>
-                  <div className="space-y-2">
-                    {connection.evidence.map((ev: any, idx: number) => (
-                      <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
-                        <div className="font-bold text-slate-900 flex items-center justify-between">
-                          <span>{ev.title}</span>
-                          <span className="uppercase text-[10px] px-1.5 py-0.5 rounded bg-white text-slate-600 border border-slate-200">
-                            {ev.type}
-                          </span>
-                        </div>
-                        <p className="text-slate-600 mt-0.5">{ev.description}</p>
-                      </div>
-                    ))}
+              {vpnProxy.vpn_status === 'unknown' && (
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 flex items-start space-x-2">
+                  <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold text-slate-700">Explanation for Unknown Status:</span> VPN and proxy indicators are reported as Unknown because a commercial IP intelligence provider API key is not configured in this deployment. VerifyLink strictly does not fabricate detection statuses.
                   </div>
                 </div>
               )}
-            </div>
+            </section>
           )}
 
-          {/* 2. Profile Information (if available) */}
-          <div className="space-y-2 border-t border-slate-200 pt-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
-                <Globe className="w-3.5 h-3.5 text-blue-600" />
-                <span>Profile Information</span>
-              </h3>
+          {/* SECTION F. Device & Browser Environment */}
+          {observedSignals && status !== 'declined' && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+                  <span className="w-5 h-5 rounded-full bg-slate-700 text-white flex items-center justify-center text-[10px] font-bold">F</span>
+                  <span>Device &amp; Browser Environment</span>
+                </h2>
+                <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                  Observed Headers
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div>
+                  <span className="text-slate-500 block text-[11px] uppercase tracking-wider font-semibold">Device Type:</span>
+                  <span className="font-bold text-slate-900 mt-0.5 block">{deviceEnv.device_type || 'Desktop'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px] uppercase tracking-wider font-semibold">Operating System:</span>
+                  <span className="font-bold text-slate-900 mt-0.5 block">{deviceEnv.os || 'Unavailable'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px] uppercase tracking-wider font-semibold">Browser:</span>
+                  <span className="font-bold text-slate-900 mt-0.5 block">{deviceEnv.browser || 'Unavailable'}</span>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* SECTION G. Public Profile Reference */}
+          <section className="space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+                <span className="w-5 h-5 rounded-full bg-cyan-700 text-white flex items-center justify-center text-[10px] font-bold">G</span>
+                <span>Public Profile Reference</span>
+              </h2>
               <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                {profileUrl ? 'Provided by User' : 'Unavailable'}
+                Supporting Reference Only
               </span>
             </div>
-            {profileUrl ? (
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
-                <div className="text-slate-500 font-medium">Public Profile Link:</div>
-                <div className="font-mono text-slate-800 break-all">{profileUrl}</div>
-                <div className="text-[11px] text-slate-400 pt-0.5">
-                  Supporting reference only. VerifyLink only inspects publicly accessible metadata.
+
+            {publicProfile.url ? (
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <span className="text-slate-500 font-semibold uppercase text-[11px]">Submitted URL:</span>
+                  {publicProfile.platform && (
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 w-fit">
+                      Platform: {publicProfile.platform}
+                    </span>
+                  )}
                 </div>
+                <div className="font-mono text-slate-800 break-all p-2 bg-white rounded border border-slate-200">
+                  {publicProfile.url}
+                </div>
+                <p className="text-[11px] text-slate-500 italic">
+                  Supporting reference only. VerifyLink inspects only publicly accessible metadata. It does NOT access private accounts, authenticated content, or passwords.
+                </p>
               </div>
             ) : (
-              <p className="text-xs text-slate-400 italic">No public profile URL submitted.</p>
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500 italic">
+                No public profile URL was submitted for this verification case.
+              </div>
             )}
-          </div>
+          </section>
 
-          {/* 3. User-Provided Information (Clearly Labeled) */}
-          {checklist && (
-            <div className="space-y-2 border-t border-slate-200 pt-5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
-                  <FileText className="w-3.5 h-3.5 text-amber-600" />
-                  <span>User-Provided Information &amp; Context</span>
-                </h3>
-                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
-                  Provided by User
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="flex items-center space-x-2">
-                  <span className={checklist.location_consistent ? 'text-emerald-700 font-bold' : 'text-slate-400'}>
-                    {checklist.location_consistent ? '✓' : '○'}
-                  </span>
-                  <span>Location consistency marked</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className={checklist.vpn_detected ? 'text-amber-700 font-bold' : 'text-slate-400'}>
-                    {checklist.vpn_detected ? '✓' : '○'}
-                  </span>
-                  <span>VPN detected</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className={checklist.money_requested ? 'text-amber-700 font-bold' : 'text-slate-400'}>
-                    {checklist.money_requested ? '✓' : '○'}
-                  </span>
-                  <span>Money or financial transfer requested</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className={checklist.urgency_pressure_used ? 'text-amber-700 font-bold' : 'text-slate-400'}>
-                    {checklist.urgency_pressure_used ? '✓' : '○'}
-                  </span>
-                  <span>Urgency or pressure tactics noted</span>
-                </div>
-              </div>
+          {/* SECTION H. Limitations & Privacy */}
+          <section className="space-y-3 pt-2">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+                <span className="w-5 h-5 rounded-full bg-rose-700 text-white flex items-center justify-center text-[10px] font-bold">H</span>
+                <span>Limitations &amp; Privacy</span>
+              </h2>
+              <span className="text-[10px] font-bold text-rose-800 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                Mandatory Notice
+              </span>
             </div>
-          )}
 
-          {/* User-Provided Case Notes (Clearly Labeled) */}
-          {notes && notes.length > 0 && (
-            <div className="space-y-2 border-t border-slate-200 pt-5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">User-Provided Case Notes</h3>
-                <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                  Provided by User • Not independently verified
-                </span>
-              </div>
-              <div className="space-y-2">
-                {notes.map((n: any) => (
-                  <div key={n.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
-                    <p className="text-slate-800">{n.note}</p>
-                    <div className="text-[10px] text-slate-400 mt-1">
-                      Recorded: {new Date(n.created_at).toLocaleString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Core Limitations Statement (Mandatory) */}
-          <div className="border-t border-slate-200 pt-6">
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-300 text-xs text-slate-700 leading-relaxed space-y-2">
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-300 text-xs text-slate-700 leading-relaxed space-y-3">
               <div className="font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                <span>Core Limitations &amp; Verification Disclaimer</span>
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                <span>Core Verification Limitations</span>
               </div>
-              <p className="font-medium text-slate-900">
-                “VerifyLink provides factual information and signals for review. It does not determine whether a person is a scammer or criminal. Network location is approximate. VPN/proxy detection may produce false positives. Public information may be incomplete.”
-              </p>
-              <p className="text-[11px] text-slate-500">
-                This document is a technical and contextual signal summary only. It should not be used as the sole basis for accusations, financial decisions, or legal conclusions.
-              </p>
+
+              <blockquote className="font-medium text-slate-900 p-3 bg-white rounded-lg border-l-4 border-amber-500 text-xs">
+                “{limitationsData.mandatory_statement}”
+              </blockquote>
+
+              <div className="space-y-1.5 text-[11px] text-slate-600 pt-1">
+                <p>• <strong>Data Minimization:</strong> Raw IP addresses are masked and minimized. Only aggregated network-level facts are stored.</p>
+                <p>• <strong>Voluntary Consent:</strong> Participation in verification is voluntary. Declining verification does not prove fraud.</p>
+                <p>• <strong>Physical Presence:</strong> Network location is an approximate estimate derived from IP routing and is not GPS or proof of physical presence.</p>
+                <p>• <strong>Signal Reliability:</strong> Commercial VPN and proxy detection heuristics may yield false positives or false negatives.</p>
+              </div>
             </div>
-          </div>
+          </section>
         </div>
       </div>
     </div>

@@ -244,21 +244,21 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
       ? `${result.city && result.city !== 'Unknown' ? result.city + ', ' : ''}${result.region && result.region !== 'Unknown' ? result.region + ', ' : ''}${result.country}`
       : null;
 
-    let comparisonOutcome: 'Approximate regions appear consistent.' | 'Approximate regions differ.' | 'Unable to compare.' = 'Unable to compare.';
+    let comparisonOutcome: 'Approximate regions are consistent.' | 'Approximate regions differ.' | 'Unable to compare.' = 'Unable to compare.';
 
     if (result?.location_comparison === 'consistent') {
-      comparisonOutcome = 'Approximate regions appear consistent.';
+      comparisonOutcome = 'Approximate regions are consistent.';
     } else if (result?.location_comparison === 'differ') {
       comparisonOutcome = 'Approximate regions differ.';
     } else if (result?.location_consistency === 'consistent') {
-      comparisonOutcome = 'Approximate regions appear consistent.';
+      comparisonOutcome = 'Approximate regions are consistent.';
     } else if (result?.location_consistency === 'inconsistent') {
       comparisonOutcome = 'Approximate regions differ.';
     } else if (claimed && observedRegion) {
       const c = claimed.toLowerCase();
       const o = observedRegion.toLowerCase();
       if (c.includes(result?.country.toLowerCase() || '') || o.includes(c)) {
-        comparisonOutcome = 'Approximate regions appear consistent.';
+        comparisonOutcome = 'Approximate regions are consistent.';
       } else {
         comparisonOutcome = 'Approximate regions differ.';
       }
@@ -300,7 +300,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
           <span className="text-xs font-semibold text-slate-600">Comparison Outcome:</span>
           <span
             className={`text-xs font-bold px-2 py-0.5 rounded ${
-              comparisonOutcome === 'Approximate regions appear consistent.'
+              comparisonOutcome === 'Approximate regions are consistent.'
                 ? 'bg-emerald-100 text-emerald-800'
                 : comparisonOutcome === 'Approximate regions differ.'
                 ? 'bg-amber-100 text-amber-900'
@@ -494,17 +494,29 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                         <div className="text-[11px] font-semibold text-slate-500 uppercase">VPN Status</div>
                         <div className="text-sm mt-1">{formatDetection(data.result.vpn_status)}</div>
-                        <div className="text-[10px] text-slate-400">IP intelligence provider</div>
+                        <div className="text-[10px] text-slate-400 truncate" title={data.result.vpn_explanation}>
+                          {data.result.vpn_explanation || 'IP intelligence lookup'}
+                        </div>
                       </div>
 
                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                         <div className="text-[11px] font-semibold text-slate-500 uppercase">Proxy Status</div>
                         <div className="text-sm mt-1">{formatDetection(data.result.proxy_status)}</div>
-                        <div className="text-[10px] text-slate-400">Open proxy lookup</div>
+                        <div className="text-[10px] text-slate-400 truncate" title={data.result.proxy_explanation}>
+                          {data.result.proxy_explanation || 'Open proxy lookup'}
+                        </div>
                       </div>
 
                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                        <div className="text-[11px] font-semibold text-slate-500 uppercase">Timestamp</div>
+                        <div className="text-[11px] font-semibold text-slate-500 uppercase">Datacenter / Hosting</div>
+                        <div className="text-sm mt-1">{formatDetection(data.result.datacenter_status)}</div>
+                        <div className="text-[10px] text-slate-400 truncate" title={data.result.datacenter_explanation}>
+                          {data.result.datacenter_explanation || 'Hosting IP lookup'}
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <div className="text-[11px] font-semibold text-slate-500 uppercase">Observation Time</div>
                         <div className="text-xs font-semibold text-slate-800 mt-1">
                           {data.result.created_at ? new Date(data.result.created_at).toLocaleString() : 'N/A'}
                         </div>

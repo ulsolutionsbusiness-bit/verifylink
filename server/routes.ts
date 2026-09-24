@@ -605,17 +605,47 @@ function parseUserAgentFactual(ua: string | undefined): {
 apiRouter.post('/verify/consent/:token', async (req: express.Request, res: Response) => {
   try {
     const token = req.params.token;
-    const { consent, statedLocation } = req.body;
+    const { consent, statedLocation } = req.body || {};
 
     const vreq = db.getVerificationRequestByToken(token);
     if (!vreq) {
-      return res.status(404).json({ error: 'Verification link not found.' });
+      return res.status(404).json({
+        error: 'Invalid Verification Link',
+        message: 'This verification link does not exist or may have been removed.'
+      });
     }
 
-    if (vreq.status !== 'active') {
+    // Handle expired links
+    const isExpired = vreq.status === 'expired' || new Date(vreq.expires_at).getTime() < Date.now();
+    if (isExpired) {
+      if (vreq.status !== 'expired') {
+        db.updateVerificationRequest(vreq.id, { status: 'expired' });
+      }
+      return res.status(410).json({
+        error: 'Link Expired',
+        message: 'This temporary verification link has expired and can no longer accept submissions.'
+      });
+    }
+
+    // Handle duplicate or completed/declined submissions
+    if (vreq.status === 'completed') {
+      return res.status(409).json({
+        error: 'Already Completed',
+        message: 'This voluntary verification has already been completed.'
+      });
+    }
+
+    if (vreq.status === 'declined') {
       return res.status(400).json({
-        error: 'Link Unavailable',
-        message: `This verification request is already ${vreq.status}.`
+        error: 'Already Declined',
+        message: 'This voluntary verification was previously declined.'
+      });
+    }
+
+    if (vreq.status === 'invalidated') {
+      return res.status(400).json({
+        error: 'Link Invalidated',
+        message: 'This verification request was invalidated by the requester.'
       });
     }
 
@@ -659,7 +689,9 @@ apiRouter.post('/verify/consent/:token', async (req: express.Request, res: Respo
     let locationConsistency: 'consistent' | 'inconsistent' | 'indeterminate' = 'indeterminate';
     let locationComparison: 'consistent' | 'differ' | 'unable_to_compare' = 'unable_to_compare';
 
-    if (effectiveClaimed && intel.country && intel.country !== 'Unknown') {
+    const observedRegionStr = `${intel.city && intel.city !== 'Unavailable' && intel.city !== 'Unknown' ? intel.city + ', ' : ''}${intel.country}`;
+
+    if (effectiveClaimed && intel.country && intel.country !== 'Unavailable' && intel.country !== 'Unknown') {
       const claimedLower = effectiveClaimed.toLowerCase();
       const countryLower = intel.country.toLowerCase();
       const cityLower = (intel.city || '').toLowerCase();
@@ -668,8 +700,8 @@ apiRouter.post('/verify/consent/:token', async (req: express.Request, res: Respo
       const isMatch =
         claimedLower.includes(countryLower) ||
         countryLower.includes(claimedLower) ||
-        (cityLower && cityLower !== 'unknown' && (claimedLower.includes(cityLower) || cityLower.includes(claimedLower))) ||
-        (regionLower && regionLower !== 'unknown' && (claimedLower.includes(regionLower) || regionLower.includes(claimedLower)));
+        (cityLower && cityLower !== 'unknown' && cityLower !== 'unavailable' && (claimedLower.includes(cityLower) || cityLower.includes(claimedLower))) ||
+        (regionLower && regionLower !== 'unknown' && regionLower !== 'unavailable' && (claimedLower.includes(regionLower) || regionLower.includes(claimedLower)));
 
       if (isMatch) {
         locationConsistency = 'consistent';
@@ -678,7 +710,7 @@ apiRouter.post('/verify/consent/:token', async (req: express.Request, res: Respo
           type: 'normal',
           category: 'connection',
           title: 'Location Signal',
-          description: 'Approximate regions appear consistent between claimed and observed network connection.'
+          description: 'Approximate regions are consistent between claimed location and observed network connection. Network location is an approximate estimate derived from IP routing and is not GPS or proof of physical presence.'
         });
       } else {
         locationConsistency = 'inconsistent';
@@ -687,15 +719,21 @@ apiRouter.post('/verify/consent/:token', async (req: express.Request, res: Respo
           type: 'attention',
           category: 'connection',
           title: 'Location Signal',
-          description: `Approximate regions differ: connection observed at ${intel.city ? intel.city + ', ' : ''}${intel.country}, while claimed location was "${effectiveClaimed}".`
+          description: `Approximate regions differ. Observed network connection indicates ${observedRegionStr}, while claimed location was "${effectiveClaimed}". Network location is an approximate estimate derived from IP routing and is not GPS or proof of physical presence.`
         });
       }
     } else {
       locationConsistency = 'indeterminate';
       locationComparison = 'unable_to_compare';
+      evidenceList.unshift({
+        type: 'unavailable',
+        category: 'connection',
+        title: 'Location Signal',
+        description: 'Unable to compare regions because claimed location or observed network connection details were not provided.'
+      });
     }
 
-    // Save verification result
+    // Save verification result with factual signals and explanations
     const result = db.createVerificationResult({
       verification_request_id: vreq.id,
       country: intel.country,
@@ -707,6 +745,10 @@ apiRouter.post('/verify/consent/:token', async (req: express.Request, res: Respo
       vpn_status: intel.vpn_status,
       proxy_status: intel.proxy_status,
       datacenter_status: intel.datacenter_status,
+      vpn_explanation: intel.vpn_explanation,
+      proxy_explanation: intel.proxy_explanation,
+      datacenter_explanation: intel.datacenter_explanation,
+      provider_name: intel.provider_name,
       evidence: evidenceList,
       limitations: intel.limitations,
       ip_masked: intel.ip_masked,
@@ -718,7 +760,7 @@ apiRouter.post('/verify/consent/:token', async (req: express.Request, res: Respo
       browser: deviceDetails.browser,
       os: deviceDetails.os,
       device_type: deviceDetails.device_type,
-      connection_type: intel.network || 'Standard IP Routing'
+      connection_type: intel.connection_type || 'Standard IP Routing'
     });
 
     // Update checklist automatically with discovered facts
@@ -742,8 +784,11 @@ apiRouter.post('/verify/consent/:token', async (req: express.Request, res: Respo
       message: 'Connection verified. Thank you.'
     });
   } catch (err: any) {
-    console.error('[Consent Handling Error]', err);
-    return res.status(500).json({ error: err.message || 'Verification processing failed.' });
+    console.error('[Verify Consent] Processing error:', err?.message || 'Unknown error');
+    return res.status(500).json({
+      error: 'Verification Processing Failed',
+      message: 'An unexpected error occurred while processing verification signals. Please try again.'
+    });
   }
 });
 
@@ -950,107 +995,256 @@ apiRouter.post('/profile/analyze', requireAccess, async (req: AuthenticatedReque
 // -------------------------------------------------------------
 
 apiRouter.get('/reports/:token', (req: express.Request, res: Response) => {
-  const token = req.params.token;
-  const vreq = db.getVerificationRequestByToken(token);
-
-  if (!vreq) {
-    return res.status(404).json({ error: 'Report not found or link has expired.' });
-  }
-
-  const result = db.getVerificationResultByRequestId(vreq.id);
-  const checklist = db.getChecklistByRequestId(vreq.id);
-  const notes = db.getCaseNotesByRequestId(vreq.id, vreq.user_id);
-
-  // Return sanitized public report (NO raw IP, NO subscriber email, NO user ID)
-  return res.json({
-    report: {
-      report_id: vreq.token,
-      label: vreq.label,
-      status: vreq.status,
-      created_at: vreq.created_at,
-      expires_at: vreq.expires_at,
-      verified_at: vreq.verified_at,
-      recipient_name: vreq.recipient_name,
-      claimed_location: vreq.claimed_location,
-      purpose: vreq.purpose,
-      profile_url: vreq.profile_url,
-      connection: result
-        ? {
-            country: result.country,
-            region: result.region,
-            city: result.city,
-            network: result.network,
-            isp: result.isp,
-            asn: result.asn,
-            vpn_status: result.vpn_status,
-            proxy_status: result.proxy_status,
-            datacenter_status: result.datacenter_status,
-            ip_summary: result.ip_masked,
-            timestamp: result.created_at,
-            browser: result.browser || 'Unavailable',
-            os: result.os || 'Unavailable',
-            device_type: result.device_type || 'Unavailable',
-            connection_type: result.connection_type || result.network || 'IP Routing',
-            location_comparison: result.location_comparison || 'unable_to_compare',
-            evidence: result.evidence,
-            limitations: result.limitations
-          }
-        : null,
-      verification_response: {
-        status: vreq.status,
-        response_timestamp: vreq.verified_at,
-        is_completed: vreq.status === 'completed',
-        is_declined: vreq.status === 'declined',
-        is_expired: vreq.status === 'expired' || new Date(vreq.expires_at).getTime() < Date.now()
-      },
-      profile_information: {
-        profile_url: vreq.profile_url || null,
-        platform: vreq.profile_url
-          ? (() => {
-              try {
-                return new URL(vreq.profile_url.startsWith('http') ? vreq.profile_url : `https://${vreq.profile_url}`).hostname.replace(/^www\./, '');
-              } catch {
-                return 'Web Profile';
-              }
-            })()
-          : 'Unavailable (No public profile URL submitted)',
-        is_available: !!vreq.profile_url
-      },
-      user_provided_information: {
-        claimed_location: vreq.claimed_location || 'Not specified by requester',
-        recipient_name: vreq.recipient_name || 'Not specified',
-        purpose: vreq.purpose || 'General verification',
-        initial_notes: vreq.initial_notes || null,
-        checklist_label: 'User-provided checklist indicators'
-      },
-      checklist: {
-        location_consistent: checklist.location_consistent,
-        vpn_detected: checklist.vpn_detected,
-        proxy_detected: checklist.proxy_detected,
-        datacenter_detected: checklist.datacenter_detected,
-        profile_available: checklist.profile_available,
-        profile_location_available: checklist.profile_location_available,
-        website_available: checklist.website_available,
-        identity_consistent: checklist.identity_consistent,
-        // Transaction checklist labeled as user-provided
-        transaction_checklist: {
-          money_requested: checklist.money_requested,
-          urgency_pressure_used: checklist.urgency_pressure_used,
-          payment_details_matched: checklist.payment_details_matched,
-          additional_verification_refused: checklist.additional_verification_refused,
-          label: 'User-provided information'
-        }
-      },
-      user_provided_notes: notes.map(n => ({
-        id: n.id,
-        note: n.note,
-        created_at: n.created_at,
-        disclaimer: 'User-provided note. Not independently verified by VerifyLink.'
-      })),
-      disclaimer:
-        'VerifyLink provides factual information and signals for review. It does not determine whether a person is a scammer or criminal. Network location is approximate. VPN/proxy detection may produce false positives. Public information may be incomplete.'
+  try {
+    const token = req.params.token;
+    if (!token) {
+      return res.status(400).json({ error: 'Token parameter is required.' });
     }
-  });
+
+    const vreq = db.getVerificationRequestByToken(token);
+    if (!vreq) {
+      return res.status(404).json({
+        error: 'Report Not Found',
+        message: 'The requested verification report does not exist or the link is invalid.'
+      });
+    }
+
+    const result = db.getVerificationResultByRequestId(vreq.id);
+    const checklist = db.getChecklistByRequestId(vreq.id);
+    const notes = db.getCaseNotesByRequestId(vreq.id, vreq.user_id);
+
+    // Compute location comparison data
+    const claimedLocation = vreq.claimed_location || 'Not specified by requester';
+    const observedRegionStr = result
+      ? `${result.city && result.city !== 'Unavailable' && result.city !== 'Unknown' ? result.city + ', ' : ''}${result.region && result.region !== 'Unavailable' && result.region !== 'Unknown' ? result.region + ', ' : ''}${result.country}`
+      : 'Unavailable (Pending or Declined)';
+
+    let comparisonOutcome: 'Approximate regions are consistent.' | 'Approximate regions differ.' | 'Unable to compare.' = 'Unable to compare.';
+    let comparisonExplanation = 'Claimed location or observed connection signals are not available for comparison.';
+
+    if (result && vreq.claimed_location && result.country && result.country !== 'Unavailable' && result.country !== 'Unknown') {
+      if (result.location_comparison === 'consistent') {
+        comparisonOutcome = 'Approximate regions are consistent.';
+        comparisonExplanation = 'Approximate regions appear consistent between claimed location and observed network routing.';
+      } else if (result.location_comparison === 'differ') {
+        comparisonOutcome = 'Approximate regions differ.';
+        comparisonExplanation = `Approximate regions differ. Observed network connection indicates ${observedRegionStr}, while claimed location was "${vreq.claimed_location}". Network location is an approximate estimate derived from IP routing and is not GPS or proof of physical presence.`;
+      }
+    }
+
+    // Return sanitized public report (NO raw IP, NO subscriber email, NO user ID)
+    return res.json({
+      report: {
+        report_id: vreq.token,
+        label: vreq.label,
+        status: vreq.status,
+        created_at: vreq.created_at,
+        expires_at: vreq.expires_at,
+        verified_at: vreq.verified_at,
+        recipient_name: vreq.recipient_name,
+        claimed_location: vreq.claimed_location,
+        purpose: vreq.purpose,
+        profile_url: vreq.profile_url,
+
+        // SECTION A: Case Record
+        case_record: {
+          report_id: vreq.token,
+          label: vreq.label,
+          status: vreq.status,
+          created_at: vreq.created_at,
+          expires_at: vreq.expires_at,
+          verified_at: vreq.verified_at,
+          recipient_name: vreq.recipient_name || 'Not specified',
+          purpose: vreq.purpose || 'General verification'
+        },
+
+        // SECTION B: User-Provided Information
+        user_provided_information: {
+          label: 'Provided by User',
+          claimed_location: vreq.claimed_location || 'Not specified by requester',
+          recipient_name: vreq.recipient_name || 'Not specified',
+          purpose: vreq.purpose || 'General verification',
+          initial_notes: vreq.initial_notes || null,
+          user_notes: notes.map(n => ({
+            id: n.id,
+            note: n.note,
+            created_at: n.created_at,
+            disclaimer: 'Provided by User • Not independently verified by VerifyLink.'
+          })),
+          transaction_checklist: {
+            money_requested: checklist?.money_requested ?? null,
+            urgency_pressure_used: checklist?.urgency_pressure_used ?? null,
+            payment_details_matched: checklist?.payment_details_matched ?? null,
+            additional_verification_refused: checklist?.additional_verification_refused ?? null,
+            label: 'Provided by User'
+          },
+          disclaimer: 'All information in this section was entered by the requester and is not independently verified by VerifyLink.'
+        },
+
+        // SECTION C: Observed Connection Signals
+        observed_connection_signals: result
+          ? {
+              label: 'Observed by VerifyLink',
+              country: result.country,
+              region: result.region,
+              city: result.city,
+              approximate_location: observedRegionStr,
+              network: result.network,
+              isp: result.isp || result.network,
+              asn: result.asn || 'Unavailable',
+              connection_type: result.connection_type || 'Standard IP Routing',
+              ip_masked: result.ip_masked || '***.***.***',
+              timestamp: result.created_at,
+              provider_name: result.provider_name || 'IP Intelligence Service',
+              evidence: result.evidence || [],
+              notice: 'Derived from public IP routing tables. Reflects network infrastructure, NOT physical GPS location.'
+            }
+          : null,
+
+        // SECTION D: Location Comparison
+        location_comparison: {
+          claimed_location: vreq.claimed_location || 'Not specified by requester',
+          observed_network_region: observedRegionStr,
+          comparison_result: comparisonOutcome,
+          explanation: comparisonExplanation,
+          status_code: result?.location_comparison || 'unable_to_compare',
+          disclaimer: 'Network location is an approximate estimate derived from IP routing and is not GPS or proof of physical presence.'
+        },
+
+        // SECTION E: VPN/Proxy Indicators
+        vpn_proxy_indicators: result
+          ? {
+              vpn_status: result.vpn_status,
+              proxy_status: result.proxy_status,
+              datacenter_status: result.datacenter_status,
+              vpn_explanation: result.vpn_explanation || (result.vpn_status === 'detected' ? 'VPN Detected' : result.vpn_status === 'not_detected' ? 'No VPN Detected' : 'Unknown: provider unconfigured or unavailable'),
+              proxy_explanation: result.proxy_explanation || (result.proxy_status === 'detected' ? 'Proxy Detected' : result.proxy_status === 'not_detected' ? 'No Proxy Detected' : 'Unknown: provider unconfigured or unavailable'),
+              datacenter_explanation: result.datacenter_explanation || (result.datacenter_status === 'detected' ? 'Datacenter / Hosting Detected' : result.datacenter_status === 'not_detected' ? 'Residential / Standard ISP' : 'Unknown'),
+              provider_name: result.provider_name || 'IP Intelligence Service',
+              disclaimer: 'VPN and proxy detection relies on commercial databases and may produce false positives or false negatives.'
+            }
+          : null,
+
+        // SECTION F: Device & Browser Environment
+        device_browser_environment: result
+          ? {
+              device_type: result.device_type || 'Unavailable',
+              os: result.os || 'Unavailable',
+              browser: result.browser || 'Unavailable',
+              user_agent_summary: result.user_agent ? 'Provided by browser headers' : 'Unavailable'
+            }
+          : null,
+
+        // SECTION G: Public Profile Reference
+        public_profile_reference: {
+          url: vreq.profile_url || null,
+          platform: vreq.profile_url
+            ? (() => {
+                try {
+                  return new URL(vreq.profile_url.startsWith('http') ? vreq.profile_url : `https://${vreq.profile_url}`).hostname.replace(/^www\./, '');
+                } catch {
+                  return 'Web Profile';
+                }
+              })()
+            : null,
+          disclaimer: 'Supporting reference only. VerifyLink does not access private accounts, authenticated content, or passwords. Only publicly accessible web metadata is examined.'
+        },
+
+        // SECTION H: Limitations & Privacy
+        limitations_and_privacy: {
+          mandatory_statement: 'VerifyLink provides factual information and signals for review. It does not determine whether a person is a scammer or criminal. Network location is approximate and does not prove physical presence. VPN/proxy detection relies on commercial databases and may produce false positives or false negatives. Public information may be incomplete.',
+          ip_masking_notice: 'Raw IP addresses are masked and minimized in compliance with privacy protections.',
+          voluntary_consent_notice: 'Participation in verification is voluntary. Declining verification does not prove fraud.',
+          limitations_list: result?.limitations || [
+            'Network location is an approximate estimate derived from IP routing and is not GPS or proof of physical presence.',
+            'VPN and proxy detection relies on commercial databases and may produce false positives or false negatives.',
+            'Technical signals are for informational review and do not constitute legal or fraud determinations.'
+          ]
+        },
+
+        // Backward compatibility properties
+        connection: result
+          ? {
+              country: result.country,
+              region: result.region,
+              city: result.city,
+              network: result.network,
+              isp: result.isp,
+              asn: result.asn,
+              vpn_status: result.vpn_status,
+              proxy_status: result.proxy_status,
+              datacenter_status: result.datacenter_status,
+              vpn_explanation: result.vpn_explanation,
+              proxy_explanation: result.proxy_explanation,
+              datacenter_explanation: result.datacenter_explanation,
+              provider_name: result.provider_name,
+              ip_summary: result.ip_masked,
+              timestamp: result.created_at,
+              browser: result.browser || 'Unavailable',
+              os: result.os || 'Unavailable',
+              device_type: result.device_type || 'Unavailable',
+              connection_type: result.connection_type || result.network || 'Standard IP Routing',
+              location_comparison: result.location_comparison || 'unable_to_compare',
+              evidence: result.evidence,
+              limitations: result.limitations
+            }
+          : null,
+        verification_response: {
+          status: vreq.status,
+          response_timestamp: vreq.verified_at,
+          is_completed: vreq.status === 'completed',
+          is_declined: vreq.status === 'declined',
+          is_expired: vreq.status === 'expired' || new Date(vreq.expires_at).getTime() < Date.now()
+        },
+        profile_information: {
+          profile_url: vreq.profile_url || null,
+          platform: vreq.profile_url
+            ? (() => {
+                try {
+                  return new URL(vreq.profile_url.startsWith('http') ? vreq.profile_url : `https://${vreq.profile_url}`).hostname.replace(/^www\./, '');
+                } catch {
+                  return 'Web Profile';
+                }
+              })()
+            : 'Unavailable (No public profile URL submitted)',
+          is_available: !!vreq.profile_url
+        },
+        checklist: checklist
+          ? {
+              location_consistent: checklist.location_consistent,
+              vpn_detected: checklist.vpn_detected,
+              proxy_detected: checklist.proxy_detected,
+              datacenter_detected: checklist.datacenter_detected,
+              profile_available: checklist.profile_available,
+              profile_location_available: checklist.profile_location_available,
+              website_available: checklist.website_available,
+              identity_consistent: checklist.identity_consistent,
+              transaction_checklist: {
+                money_requested: checklist.money_requested,
+                urgency_pressure_used: checklist.urgency_pressure_used,
+                payment_details_matched: checklist.payment_details_matched,
+                additional_verification_refused: checklist.additional_verification_refused,
+                label: 'Provided by User'
+              }
+            }
+          : null,
+        user_provided_notes: notes.map(n => ({
+          id: n.id,
+          note: n.note,
+          created_at: n.created_at,
+          disclaimer: 'Provided by User • Not independently verified by VerifyLink.'
+        })),
+        disclaimer:
+          'VerifyLink provides factual information and signals for review. It does not determine whether a person is a scammer or criminal. Network location is approximate. VPN/proxy detection may produce false positives. Public information may be incomplete.'
+      }
+    });
+  } catch (err: any) {
+    console.error('[Report Fetch Error]', err?.message || 'Unknown error');
+    return res.status(500).json({
+      error: 'Report Error',
+      message: 'Unable to retrieve report details at this time.'
+    });
+  }
 });
 
 // -------------------------------------------------------------

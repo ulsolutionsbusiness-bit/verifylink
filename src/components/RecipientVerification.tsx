@@ -191,34 +191,55 @@ export const RecipientVerification: React.FC<RecipientVerificationProps> = ({ to
                 {/* Key Disclosures List */}
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs text-slate-700">
                   <div className="font-bold text-slate-900 text-xs uppercase tracking-wider">
-                    Disclosures &amp; Protections
+                    Disclosures &amp; Voluntary Protections
                   </div>
 
                   <div className="flex items-start space-x-2.5">
-                    <Radio className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-semibold text-slate-900">Observed Signals:</span> Approximate network region, country, network operator (ISP), connection type, VPN/proxy indicators, and device environment.
+                      <span className="font-semibold text-slate-900">Voluntary Participation:</span> Your participation is completely voluntary. You are free to decline at any time. Declining does not imply wrongdoing.
                     </div>
                   </div>
 
                   <div className="flex items-start space-x-2.5">
-                    <Lock className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <Lock className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-semibold text-slate-900">No Account or Passwords:</span> You do not need to create an account. No passwords, personal credentials, or private accounts are accessed.
+                      <span className="font-semibold text-slate-900">No Account or Password Required:</span> You do not need to register, log in, or install any software. No password or security credential is ever requested.
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-2.5">
+                    <EyeOff className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold text-slate-900">No Private Account Access:</span> VerifyLink never accesses your social media accounts, messages, personal profiles, or device storage.
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-2.5">
+                    <Radio className="w-4 h-4 text-cyan-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold text-slate-900">Approximate Network Signals:</span> If you agree, standard routing indicators are observed (approximate network region, country, network operator / ISP, VPN/proxy indicators, and browser environment).
                     </div>
                   </div>
 
                   <div className="flex items-start space-x-2.5">
                     <Navigation className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-semibold text-slate-900">No Geolocation/GPS:</span> Precise GPS location is never accessed unless you separately choose to grant it.
+                      <span className="font-semibold text-slate-900">No GPS Location:</span> Precise physical or GPS location is never accessed unless you separately and explicitly grant browser geolocation permission.
                     </div>
                   </div>
 
                   <div className="flex items-start space-x-2.5">
-                    <EyeOff className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                    <ShieldCheck className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-semibold text-slate-900">No Fraud Accusations:</span> VerifyLink provides factual signals only. It does not accuse anyone of fraud or make criminal determinations.
+                      <span className="font-semibold text-slate-900">Raw IP Masked:</span> Raw IP addresses are masked and minimized. Only aggregated network-level signals are stored.
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-2.5">
+                    <Info className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold text-slate-900">Informational Only:</span> Observed signals are factual technical indicators only and do NOT constitute a fraud, scam, or criminal determination.
                     </div>
                   </div>
                 </div>
